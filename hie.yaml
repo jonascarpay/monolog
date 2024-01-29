@@ -1,0 +1,16 @@
+cradle:
+  multi:
+    # - path: "ignore/"
+    #   config: {cradle: {none: }}
+
+    - path: "src"
+      config: {cradle: {cabal: {component: "lib:slog"}}}
+
+    - path: "app"
+      config: {cradle: {cabal: {component: "slog:slog-exe"}}}
+
+    - path: "test"
+      config: {cradle: {cabal: {component: "slog:slog-test"}}}
+
+    - path: "bench"
+      config: {cradle: {cabal: {component: "slog:slog-bench"}}}
