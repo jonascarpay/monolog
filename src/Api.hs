@@ -171,19 +171,14 @@ server (Env lock) path = getNotes :<|> newNote :<|> noteApi
     noteApi noteId = putBody :<|> archivePutNote :<|> reopenNote
       where
         putBody :: NoteBody -> Handler Redirection
-        putBody (NoteBody body')
-          | Text.null body' = do
-              db <- readDb
-              writeDb $ deleteNote noteId db
-              redirectTo "#new"
-          | otherwise = do
-              db <- readDb
-              case lookupNote noteId db of
-                Nothing -> throwError err404
-                Just note -> do
-                  let note' = note {body = body'} :: Note
-                  writeDb $ insertNote note' db
-                  redirectTo $ '#' : toString noteId
+        putBody (NoteBody body') = do
+          db <- readDb
+          case lookupNote noteId db of
+            Nothing -> throwError err404
+            Just note -> do
+              let note' = note {body = body'} :: Note
+              writeDb $ insertNote note' db
+              redirectTo $ '#' : toString noteId
 
         archivePutNote :: NoteBody -> Handler Redirection
         archivePutNote (NoteBody body')
