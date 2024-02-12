@@ -13,7 +13,7 @@ import Data.Maybe
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time
-import Data.UUID (UUID, toText)
+import Data.UUID (UUID, toString, toText)
 import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
 import Network.Wai.Handler.Warp qualified as Warp
@@ -42,9 +42,8 @@ type FileApi =
 
 type NoteApi =
   ReqBody '[FormUrlEncoded] NoteBody :> PostRedirect
-    :<|> "delete" :> PostRedirect
     :<|> ReqBody '[FormUrlEncoded] NoteBody :> "archive" :> PostRedirect
-    :<|> "open" :> PostRedirect
+    :<|> "reopen" :> PostRedirect
 
 data NotesPage = NotesPage FilePath NoteDb
 
@@ -57,7 +56,7 @@ instance ToMarkup NotesPage where
         Html.link ! Attr.rel "stylesheet" ! Attr.href "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
       Html.body $ Html.div ! Attr.class_ "container" $ do
         Html.div ! Attr.class_ "row my-3" $ do
-          h "New"
+          h ! Attr.id "new" $ "New"
           Html.form ! Attr.action (pathLink path []) ! Attr.method "post" $ do
             Html.div ! Attr.class_ "pb-3" $ textarea 5 ! Attr.required "" ! Attr.name "body" $ ""
             button ! Attr.class_ "btn btn-success" $ do
@@ -70,7 +69,7 @@ instance ToMarkup NotesPage where
               uuid
               (fmtTime t)
               ( Html.form ! Attr.method "post" $ do
-                  Html.div ! Attr.class_ "pb-3" $ textarea (length (Text.lines body) + 2) ! Attr.required "" ! Attr.name "body" $ Html.text body
+                  Html.div ! Attr.class_ "pb-3" $ textarea (length (Text.lines body) + 2) ! Attr.name "body" $ Html.text body
                   Html.div ! Attr.class_ "row" $ do
                     Html.div ! Attr.class_ "col-6" $ do
                       button ! Attr.class_ "btn btn-primary w-100" ! Attr.formaction (noteLink path uuid []) $ do
@@ -93,7 +92,7 @@ instance ToMarkup NotesPage where
               )
               ( do
                   Html.div ! Attr.class_ "mb-3 font-monospace" ! Attr.style "white-space: pre-wrap" $ Html.text body
-                  Html.form ! Attr.action (noteLink path uuid ["/open"]) ! Attr.method "post" $ do
+                  Html.form ! Attr.action (noteLink path uuid ["/reopen"]) ! Attr.method "post" $ do
                     button ! Attr.class_ "btn btn-outline-secondary btn-sm" ! Attr.type_ "submit" $ do
                       Html.i ! Attr.class_ "bi bi-journal-arrow-up" $ ""
                       " Reopen"
@@ -141,8 +140,8 @@ newtype Env = Env MultiLock
 server :: Env -> Server HtmlApi
 server (Env lock) path = getNotes :<|> newNote :<|> noteApi
   where
-    redirect :: Handler Redirection
-    redirect = pure $ addHeader ('/' : path) NoContent
+    redirectTo :: String -> Handler Redirection
+    redirectTo tgt = pure $ addHeader ('/' : path <> tgt) NoContent
 
     readDb :: Handler NoteDb
     readDb = do
@@ -166,47 +165,51 @@ server (Env lock) path = getNotes :<|> newNote :<|> noteApi
         now <- getZonedTime
         pure $ Note uuid now Nothing body
       writeDb $ insertNote note db
-      redirect
+      redirectTo "#new"
 
     noteApi :: UUID -> Server NoteApi
-    noteApi noteId = putBody :<|> deleteNote' :<|> archivePutNote :<|> openNote
+    noteApi noteId = putBody :<|> archivePutNote :<|> reopenNote
       where
         putBody :: NoteBody -> Handler Redirection
-        putBody (NoteBody body') = do
-          db <- readDb
-          case lookupNote noteId db of
-            Nothing -> throwError err404
-            Just note -> do
-              let note' = note {body = body'} :: Note
-              writeDb $ insertNote note' db
-              redirect
-
-        deleteNote' :: Handler Redirection
-        deleteNote' = do
-          db <- readDb
-          writeDb $ deleteNote noteId db
-          redirect
+        putBody (NoteBody body')
+          | Text.null body' = do
+              db <- readDb
+              writeDb $ deleteNote noteId db
+              redirectTo "#new"
+          | otherwise = do
+              db <- readDb
+              case lookupNote noteId db of
+                Nothing -> throwError err404
+                Just note -> do
+                  let note' = note {body = body'} :: Note
+                  writeDb $ insertNote note' db
+                  redirectTo $ '#' : toString noteId
 
         archivePutNote :: NoteBody -> Handler Redirection
-        archivePutNote (NoteBody body') = do
-          now <- liftIO getZonedTime
-          db <- readDb
-          case lookupNote noteId db of
-            Nothing -> throwError err404
-            Just note -> do
-              let note' = (note {body = body', archive_time = Just now} :: Note)
-              writeDb $ insertNote note' db
-              redirect
+        archivePutNote (NoteBody body')
+          | Text.null body' = do
+              db <- readDb
+              writeDb $ deleteNote noteId db
+              redirectTo "#new"
+          | otherwise = do
+              now <- liftIO getZonedTime
+              db <- readDb
+              case lookupNote noteId db of
+                Nothing -> throwError err404
+                Just note -> do
+                  let note' = (note {body = body', archive_time = Just now} :: Note)
+                  writeDb $ insertNote note' db
+                  redirectTo "#open"
 
-        openNote :: Handler Redirection
-        openNote = do
+        reopenNote :: Handler Redirection
+        reopenNote = do
           db <- readDb
           case lookupNote noteId db of
             Nothing -> throwError err404
             Just note -> do
               let note' = (note {archive_time = Nothing} :: Note)
               writeDb $ insertNote note' db
-              redirect
+              redirectTo $ '#' : toString noteId
 
 newtype NoteBody = NoteBody
   {body :: Text}
