@@ -21,7 +21,7 @@ import NoteDb
 import Servant
 import Servant.HTML.Blaze (HTML)
 import System.Directory
-import Text.Blaze.Html (Html, ToMarkup, (!))
+import Text.Blaze.Html (ToMarkup, (!))
 import Text.Blaze.Html qualified as Html
 import Text.Blaze.Html5 (AttributeValue)
 import Text.Blaze.Html5 qualified as Html
@@ -50,31 +50,64 @@ data NotesPage = NotesPage FilePath NoteDb
 
 instance ToMarkup NotesPage where
   toMarkup (NotesPage path db) =
-    let (open, close) = splitNotes (toDescList db)
-     in Html.docTypeHtml $ do
-          Html.body $ do
-            Html.form ! Attr.action (pathLink path []) ! Attr.method "post" $ do
-              Html.textarea ! Attr.required "" ! Attr.name "body" $ ""
-              Html.button ! Attr.type_ "submit" $ "Submit"
-            Html.hr
-            Html.div ! Attr.id "notes" $ do
-              forM_ open $ \(t, uuid, body) ->
-                Html.div ! Attr.id (Html.textValue $ toText uuid) $ do
-                  Html.p . Html.string $ fmtTime t
-                  Html.form ! Attr.method "post" $ do
-                    Html.textarea ! Attr.required "" ! Attr.name "body" $ Html.text body
-                    Html.button ! Attr.type_ "submit" ! Attr.formaction (noteLink path uuid []) $ "Save"
-                    Html.button ! Attr.type_ "submit" ! Attr.formaction (noteLink path uuid ["/close"]) $ "Save & Close"
-              unless (null open || null close) Html.hr
-              forM_ close $ \(t_open, t_close, uuid, body) ->
-                Html.div ! Attr.id (Html.textValue $ toText uuid) $ do
-                  Html.p $ do
-                    Html.string $ fmtTime t_open
-                    Html.preEscapedText " &mdash; "
-                    Html.string $ fmtTime t_close
-                  Html.p $ Html.text body
+    Html.docTypeHtml ! Html.dataAttribute "bs-theme" "dark" $ do
+      Html.head $ do
+        Html.meta ! Attr.name "viewport" ! Attr.content "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+        Html.link ! Attr.rel "stylesheet" ! Attr.href "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+        Html.link ! Attr.rel "stylesheet" ! Attr.href "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      Html.body $ Html.div ! Attr.class_ "container" $ do
+        Html.div ! Attr.class_ "row my-3" $ do
+          h "New"
+          Html.form ! Attr.action (pathLink path []) ! Attr.method "post" $ do
+            Html.div ! Attr.class_ "pb-3" $ textarea 5 ! Attr.required "" ! Attr.name "body" $ ""
+            button $ do
+              Html.i ! Attr.class_ "bi bi-journal-plus" $ ""
+              " Create"
+        Html.div ! Attr.id "notes" $ do
+          h ! Attr.id "open" $ Html.string $ "Open (" <> show (length open) <> ")"
+          forM_ open $ \(t, uuid, body) ->
+            card
+              uuid
+              (Html.small $ fmtTime t)
+              ( Html.form ! Attr.method "post" $ do
+                  Html.div ! Attr.class_ "pb-3" $ textarea (length (Text.lines body) + 2) ! Attr.required "" ! Attr.name "body" $ Html.text body
+                  Html.div ! Attr.class_ "row" $ do
+                    Html.div ! Attr.class_ "col-6" $ do
+                      button ! Attr.formaction (noteLink path uuid []) $ do
+                        Html.i ! Attr.class_ "bi bi-journal-check" $ ""
+                        " Save"
+                    Html.div ! Attr.class_ "col-6" $ do
+                      button ! Attr.formaction (noteLink path uuid ["/close"]) $ do
+                        Html.i ! Attr.class_ "bi bi-journal-arrow-down" $ ""
+                        " Save & Close"
+              )
+          unless (null closed) $ do
+            h ! Attr.id "closed" $ Html.string $ "Closed (" <> show (length closed) <> ")"
+          forM_ closed $ \(t_open, t_close, uuid, body) ->
+            card
+              uuid
+              ( Html.small $ do
+                  fmtTime t_open
+                  Html.preEscapedText " &mdash; "
+                  fmtTime t_close
+              )
+              ( do
+                  Html.div ! Attr.class_ "font-monospace" ! Attr.style "white-space: pre-wrap" $ Html.text body
                   Html.form ! Attr.action (noteLink path uuid ["/open"]) ! Attr.method "post" $ do
-                    Html.button ! Attr.type_ "submit" $ "Reopen"
+                    button $ do
+                      Html.i ! Attr.class_ "bi bi-journal-arrow-up" $ ""
+                      " Reopen"
+              )
+    where
+      (open, closed) = splitNotes (toDescList db)
+      card uuid hdr bdy = Html.div ! Attr.class_ "card my-3" ! Attr.id (Html.textValue $ toText uuid) $ do
+        Html.div ! Attr.class_ "card-header" $ hdr
+        Html.div ! Attr.class_ "card-body" $ bdy
+      h = Html.h5 ! Attr.class_ "mt-5"
+      button = Html.button ! Attr.class_ "btn btn-outline-primary btn-sm w-100" ! Attr.type_ "submit"
+
+      textarea :: Int -> Html.Html -> Html.Html
+      textarea rows = Html.textarea ! Attr.class_ "form-control font-monospace" ! Attr.rows (Html.stringValue $ show rows)
 
 partitionWith :: (a -> Either b c) -> [a] -> ([b], [c])
 partitionWith _ [] = ([], [])
@@ -95,15 +128,8 @@ pathLink path tail = Html.textValue $ Text.concat $ "/" : Text.pack path : tail
 noteLink :: FilePath -> UUID -> [Text] -> AttributeValue
 noteLink path uuid tail = pathLink path ("/" : toText uuid : tail)
 
-fmtTime :: ZonedTime -> String
-fmtTime = formatTime defaultTimeLocale "%y-%m-%d %H:%M"
-
-header :: Note -> Html
-header note = do
-  Html.string $ fmtTime note.open_time
-  forM_ note.close_time $ \close -> do
-    Html.preEscapedText " &mdash; "
-    Html.string $ fmtTime close
+fmtTime :: ZonedTime -> Html.Html
+fmtTime t = Html.time $ Html.string $ formatTime defaultTimeLocale "%y-%m-%d %H:%M" t
 
 mainWithConfig :: IO ()
 mainWithConfig = do
