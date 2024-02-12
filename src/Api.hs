@@ -16,6 +16,7 @@ import Data.Time
 import Data.UUID (UUID, toString, toText)
 import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
+import IO
 import Network.Wai.Handler.Warp qualified as Warp
 import NoteDb
 import Servant
@@ -137,10 +138,10 @@ splitNotes = partitionWith $ \n -> case n.archive_time of
   Just t -> Right (n.open_time, t, n.id, n.body)
 
 pathLink :: FilePath -> [Text] -> AttributeValue
-pathLink path tail = Html.textValue $ Text.concat $ "/" : Text.pack path : tail
+pathLink path t = Html.textValue $ Text.concat $ "/" : Text.pack path : t
 
 noteLink :: FilePath -> UUID -> [Text] -> AttributeValue
-noteLink path uuid tail = pathLink path ("/" : toText uuid : tail)
+noteLink path uuid t = pathLink path ("/" : toText uuid : t)
 
 fmtTime :: ZonedTime -> Html.Html
 fmtTime t = Html.time $ Html.string $ formatTime defaultTimeLocale "%y-%m-%d %H:%M" t
@@ -152,6 +153,9 @@ mainWithConfig = do
 
 newtype Env = Env MultiLock
 
+fixLineEndings :: Text -> Text
+fixLineEndings = Text.replace "\r\n" "\n"
+
 server :: Env -> Server HtmlApi
 server (Env lock) path = getNotes :<|> newNote :<|> noteApi
   where
@@ -162,9 +166,7 @@ server (Env lock) path = getNotes :<|> newNote :<|> noteApi
     readDb = do
       exists <- liftIO $ doesFileExist path
       unless exists $ throwError err404
-      liftIO (withRead lock path $ readNoteDb path) >>= \case
-        Left err -> throwError err500 {errBody = BSL8.pack err}
-        Right db -> pure db
+      liftIO (withRead lock path $ readNoteDb path)
 
     writeDb :: NoteDb -> Handler ()
     writeDb db = liftIO $ withWrite lock path $ writeNoteDb path db
@@ -175,10 +177,7 @@ server (Env lock) path = getNotes :<|> newNote :<|> noteApi
     newNote :: NoteBody -> Handler Redirection
     newNote (NoteBody body) = do
       db <- readDb
-      note <- liftIO $ do
-        uuid <- nextRandom
-        now <- getZonedTime
-        pure $ Note uuid now Nothing body
+      note <- liftIO $ fromPartial $ PartialNote Nothing Nothing Nothing (fixLineEndings body)
       writeDb $ insertNote note db
       redirectTo "#new"
 
@@ -191,7 +190,7 @@ server (Env lock) path = getNotes :<|> newNote :<|> noteApi
           case lookupNote noteId db of
             Nothing -> throwError err404
             Just note -> do
-              let note' = note {body = body'} :: Note
+              let note' = note {body = fixLineEndings body'} :: Note
               writeDb $ insertNote note' db
               redirectTo $ '#' : toString noteId
 
@@ -207,7 +206,7 @@ server (Env lock) path = getNotes :<|> newNote :<|> noteApi
               case lookupNote noteId db of
                 Nothing -> throwError err404
                 Just note -> do
-                  let note' = (note {body = body', archive_time = Just now} :: Note)
+                  let note' = (note {body = fixLineEndings body', archive_time = Just now} :: Note)
                   writeDb $ insertNote note' db
                   redirectTo "#open"
 

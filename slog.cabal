@@ -44,18 +44,19 @@ library
   hs-source-dirs:  src
   exposed-modules:
     Api
+    IO
     NoteDb
 
   -- Db
   build-depends:
     , aeson
     , blaze-html
-    , http-types
     , bytestring
     , containers
     , directory
     , hashable
     , http-api-data
+    , http-types
     , servant
     , servant-blaze
     , servant-server

@@ -1,7 +1,6 @@
 module NoteDb
   ( Note (..),
-    readNoteDb,
-    writeNoteDb,
+    PartialNote (..),
     insertNote,
     lookupNote,
     NoteDb (..),
@@ -12,17 +11,14 @@ module NoteDb
     newMultiLock,
     withWrite,
     withRead,
+    fromPartial,
+    fromList,
   )
 where
 
 import Control.Concurrent.STM
 import Control.Exception (bracket_)
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Aeson qualified as Aeson
-import Data.ByteString qualified as BS
-import Data.ByteString.Char8 qualified as BS8
-import Data.ByteString.Lazy qualified as BSL
-import Data.ByteString.Lazy.Char8 qualified as BSL8
 import Data.Foldable qualified as Foldable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -37,6 +33,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time
 import Data.UUID (UUID)
+import Data.UUID.V4 qualified as UUID
 import GHC.Generics (Generic)
 import Prelude hiding (id)
 
@@ -46,16 +43,25 @@ data Note = Note
     archive_time :: Maybe ZonedTime,
     body :: Text
   }
-  deriving stock (Generic)
+  deriving stock (Generic, Show)
   deriving anyclass (ToJSON, FromJSON)
 
-newtype NoteDb = NoteDb (HashMap UUID Note)
+data PartialNote = PartialNote
+  { id :: Maybe UUID,
+    open_time :: Maybe ZonedTime,
+    archive_time :: Maybe ZonedTime,
+    body :: Text
+  }
+  deriving stock (Generic, Show)
+  deriving anyclass (ToJSON, FromJSON)
 
-readNoteDb :: FilePath -> IO (Either String NoteDb)
-readNoteDb fp = fmap fromList . traverse Aeson.eitherDecodeStrict . BS8.lines <$> BS.readFile fp
-  where
-    fromList :: [Note] -> NoteDb
-    fromList = NoteDb . HashMap.fromList . fmap (\n -> (n.id, n))
+fromPartial :: PartialNote -> IO Note
+fromPartial (PartialNote pid popen archive_time body) = do
+  id <- maybe UUID.nextRandom pure pid
+  open_time <- maybe getZonedTime pure popen
+  pure $ Note id open_time archive_time body
+
+newtype NoteDb = NoteDb (HashMap UUID Note)
 
 toAscList :: NoteDb -> [Note]
 toAscList (NoteDb db) = sortOn (\n -> zonedTimeToUTC n.open_time) $ Foldable.toList db
@@ -66,9 +72,6 @@ toDescList (NoteDb db) =
     . sortBy (comparing $ Down . fst)
     . fmap (\n -> (zonedTimeToUTC n.open_time, n))
     $ Foldable.toList db
-
-writeNoteDb :: FilePath -> NoteDb -> IO ()
-writeNoteDb fp = BSL.writeFile fp . BSL8.unlines . fmap Aeson.encode . toAscList
 
 lookupNote :: UUID -> NoteDb -> Maybe Note
 lookupNote noteId (NoteDb db) = HashMap.lookup noteId db
@@ -97,6 +100,9 @@ newMultiLock = do
   r <- newTVarIO mempty
   w <- newTVarIO mempty
   pure $ MultiLock r w
+
+fromList :: [Note] -> NoteDb
+fromList = NoteDb . HashMap.fromList . fmap (\n -> (n.id, n))
 
 withRead :: MultiLock -> FilePath -> IO a -> IO a
 withRead (MultiLock r w) path =
