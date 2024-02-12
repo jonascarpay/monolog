@@ -8,13 +8,11 @@ where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.ByteString.Lazy.Char8 qualified as BSL8
 import Data.Maybe
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time
 import Data.UUID (UUID, toString, toText)
-import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
 import IO
 import Network.Wai.Handler.Warp qualified as Warp
@@ -55,6 +53,7 @@ instance ToMarkup NotesPage where
         Html.meta ! Attr.name "viewport" ! Attr.content "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
         Html.link ! Attr.rel "stylesheet" ! Attr.href "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
         Html.link ! Attr.rel "stylesheet" ! Attr.href "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        Html.title $ Html.string path
       Html.body $ Html.div ! Attr.class_ "container" $ do
         Html.div ! Attr.class_ "row my-3" $ do
           h ! Attr.id "new" $ do
