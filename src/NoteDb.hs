@@ -43,7 +43,7 @@ import Prelude hiding (id)
 data Note = Note
   { id :: UUID,
     open_time :: ZonedTime,
-    close_time :: Maybe ZonedTime,
+    archive_time :: Maybe ZonedTime,
     body :: Text
   }
   deriving stock (Generic)
