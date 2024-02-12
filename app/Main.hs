@@ -1,4 +1,4 @@
-import Lib
+import Api
 
 main :: IO ()
-main = putStrLn "heyyyyyy"
+main = mainWithConfig
