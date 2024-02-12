@@ -71,7 +71,11 @@ instance ToMarkup NotesPage where
           forM_ open $ \(t, uuid, body) ->
             card
               uuid
-              (fmtTime t)
+              ( do
+                  Html.i ! Attr.class_ "bi bi-file-earmark-plus" $ ""
+                  " "
+                  fmtTime t
+              )
               ( Html.form ! Attr.method "post" $ do
                   Html.div ! Attr.class_ "pb-3" $ textarea (length (Text.lines body) + 2) ! Attr.name "body" $ Html.text body
                   Html.div ! Attr.class_ "row" $ do
@@ -92,8 +96,12 @@ instance ToMarkup NotesPage where
             card
               uuid
               ( do
+                  Html.i ! Attr.class_ "bi bi-file-earmark-plus" $ ""
+                  " "
                   fmtTime t_open
-                  Html.preEscapedText " &mdash; "
+                  Html.preEscapedText "&emsp;"
+                  Html.i ! Attr.class_ "bi bi-journal" $ ""
+                  " "
                   fmtTime t_archive
               )
               ( do
@@ -106,7 +114,8 @@ instance ToMarkup NotesPage where
     where
       (open, archived) = splitNotes (toDescList db)
       card uuid hdr bdy = Html.div ! Attr.class_ "card my-3" ! Attr.id (Html.textValue $ toText uuid) $ do
-        Html.div ! Attr.class_ "card-header" $ Html.small ! Attr.class_ "text-muted" $ hdr
+        Html.div ! Attr.class_ "card-header" $ do
+          Html.div $ Html.small ! Attr.class_ "text-muted" $ hdr
         Html.div ! Attr.class_ "card-body" $ bdy
       h = Html.h5 ! Attr.class_ "mt-5"
       button = Html.button ! Attr.type_ "submit"
