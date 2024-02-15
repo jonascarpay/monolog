@@ -34,7 +34,8 @@ printText = Builder.toLazyText . mconcat . intersperse (Builder.fromText separat
           Builder.fromString $ fmtTime n.open_time,
           "\n",
           maybe mempty (\t -> Builder.fromText prefixArchived <> Builder.fromString (fmtTime t) <> "\n") n.archive_time,
-          Builder.fromText $ dropTrailingWhitespace n.body,
+          "\n",
+          Builder.fromText $ strip n.body,
           "\n"
         ]
 
@@ -53,8 +54,8 @@ readNoteDb path = do
 writeNoteDb :: FilePath -> NoteDb -> IO ()
 writeNoteDb fp = Lazy.writeFile fp . printText . toAscList
 
-dropTrailingWhitespace :: Text -> Text
-dropTrailingWhitespace = Text.dropWhileEnd $ \c -> c == ' ' || c == '\n'
+strip :: Text -> Text
+strip = Text.dropWhileEnd (\c -> c == ' ' || c == '\n') . Text.dropWhile (== '\n')
 
 parseText :: Lazy.Text -> [PartialNote]
 parseText = parseNote . fmap Lazy.toStrict . Lazy.lines
@@ -83,4 +84,4 @@ parseText = parseNote . fmap Lazy.toStrict . Lazy.lines
     parseArchived muuid mcreated ls = parseBody muuid mcreated Nothing [] ls
     parseBody muuid mcreated marchived body (line : ls)
       | line /= separator = parseBody muuid mcreated marchived (line : body) ls
-    parseBody muuid mcreated marchived body ls = PartialNote muuid mcreated marchived (dropTrailingWhitespace . Text.unlines . reverse $ body) : parseNote ls
+    parseBody muuid mcreated marchived body ls = PartialNote muuid mcreated marchived (strip . Text.unlines . reverse $ body) : parseNote ls

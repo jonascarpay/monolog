@@ -41,7 +41,7 @@ data Note = Note
   { id :: UUID,
     open_time :: ZonedTime,
     archive_time :: Maybe ZonedTime,
-    body :: Text
+    body :: Text -- TODO newtype to guarantuee stripping
   }
   deriving stock (Generic, Show)
   deriving anyclass (ToJSON, FromJSON)
