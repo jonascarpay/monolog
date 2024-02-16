@@ -58,16 +58,13 @@ instance ToMarkup NotesPage where
         Html.div ! Attr.class_ "row my-3" $ do
           h ! Attr.id "new" $ do
             Html.i ! Attr.class_ "bi bi-file-earmark" $ ""
-            " New"
           Html.form ! Attr.action (pathLink path []) ! Attr.method "post" $ do
             Html.div ! Attr.class_ "pb-3" $ textarea 5 ! Attr.required "" ! Attr.name "body" $ ""
             button ! Attr.class_ "btn btn-success" $ do
               Html.i ! Attr.class_ "bi bi-file-earmark-plus" $ ""
-              " Create"
         Html.div ! Attr.id "notes" $ do
           h ! Attr.id "open" $ do
             Html.i ! Attr.class_ "bi bi-file-earmark-text" $ ""
-            Html.string $ " Open (" <> show (length open) <> ")"
           forM_ open $ \(t, uuid, body) ->
             card
               uuid
@@ -78,20 +75,14 @@ instance ToMarkup NotesPage where
               )
               ( Html.form ! Attr.method "post" $ do
                   Html.div ! Attr.class_ "pb-3" $ textarea (length (Text.lines body) + 2) ! Attr.name "body" $ Html.text body
-                  Html.div ! Attr.class_ "row" $ do
-                    Html.div ! Attr.class_ "col-6" $ do
-                      button ! Attr.class_ "btn btn-primary w-100" ! Attr.formaction (noteLink path uuid []) $ do
-                        Html.i ! Attr.class_ "bi bi-file-earmark-check" $ ""
-                        " Save"
-                    Html.div ! Attr.class_ "col-6" $ do
-                      button ! Attr.class_ "btn btn-primary w-100" ! Attr.formaction (noteLink path uuid ["/archive"]) $ do
-                        Html.i ! Attr.class_ "bi bi-journal-arrow-down" $ ""
-                        " Archive"
+                  button ! Attr.class_ "btn btn-primary" ! Attr.formaction (noteLink path uuid []) $ do
+                    Html.i ! Attr.class_ "bi bi-file-earmark-check" $ ""
+                  button ! Attr.class_ "mx-1 btn btn-primary" ! Attr.formaction (noteLink path uuid ["/archive"]) $ do
+                    Html.i ! Attr.class_ "bi bi-journal-arrow-down" $ ""
               )
           unless (null archived) $ do
             h ! Attr.id "archived" $ do
               Html.i ! Attr.class_ "bi bi-journal" $ ""
-              Html.string $ " Archived (" <> show (length archived) <> ")"
           forM_ archived $ \(t_open, t_archive, uuid, body) ->
             card
               uuid
@@ -109,7 +100,6 @@ instance ToMarkup NotesPage where
                   Html.form ! Attr.action (noteLink path uuid ["/reopen"]) ! Attr.method "post" $ do
                     button ! Attr.class_ "btn btn-outline-secondary btn-sm" ! Attr.type_ "submit" $ do
                       Html.i ! Attr.class_ "bi bi-journal-arrow-up" $ ""
-                      " Reopen"
               )
     where
       (open, archived) = splitNotes (toDescList db)
