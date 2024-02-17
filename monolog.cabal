@@ -45,8 +45,8 @@ library
   exposed-modules:
     Api
     IO
+    Monolog.DateTime
     Monolog.Parser
-    Monolog.Time
     NoteDb
 
   build-depends:

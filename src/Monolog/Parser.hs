@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use <$>" #-}
 module Monolog.Parser
   ( parseTimeStamps,
   )
@@ -10,7 +13,116 @@ import Data.Maybe
 import Data.Text (Text)
 import Data.Text.Internal.Fusion
 import Data.Time
-import Monolog.Time
+import Monolog.DateTime
+
+parseTimestamp :: Parser PartialTimestamp
+parseTimestamp =
+  -- TODO optimize
+  asum
+    [ do
+        dt <- pPartialDate
+        asum
+          [ do
+              sep
+              end <- pPartialDate
+              pure $ DateRangePartial dt end,
+            do
+              expectChar ' '
+              tod <- pTimeOfDay
+              asum
+                [ do
+                    sep
+                    mEnd <- optional $ pPartialDate <* expectChar ' '
+                    todEnd <- pTimeOfDay
+                    mtz <- pMtz
+                    pure $ DateTimeRangePartial dt tod mEnd todEnd mtz,
+                  do
+                    mtz <- pMtz
+                    pure $ DateTimePartial dt tod mtz
+                ],
+            pure $ DatePartial dt
+          ],
+      do
+        dt <- pFullDate
+        asum
+          [ do
+              sep
+              end <- pFullDate
+              pure $ DateRangeFull dt end,
+            do
+              expectChar ' '
+              tod <- pTimeOfDay
+              asum
+                [ do
+                    sep
+                    mEnd <- optional $ pFullDate <* expectChar ' '
+                    todEnd <- pTimeOfDay
+                    mtz <- pMtz
+                    pure $ DateTimeRangeFull dt tod mEnd todEnd mtz,
+                  do
+                    mtz <- pMtz
+                    pure $ DateTimeFull dt tod mtz
+                ],
+            pure $ DateFull dt
+          ],
+      do
+        tod1 <- pTimeOfDay
+        asum
+          [ do
+              sep
+              tod2 <- pTimeOfDay
+              mtz <- pMtz
+              pure $ DateTimeRangeToday tod1 tod2 mtz,
+            do
+              mtz <- pMtz
+              pure $ DateTimeToday tod1 mtz
+          ]
+    ]
+  where
+    pMtz = optional $ expectChar ' ' >> pTimeZone
+    sep = expectChar ' ' >> expectChar '-' >> expectChar ' '
+
+pPartialDate :: Parser PartialDate
+pPartialDate = do
+  m <- p12digits
+  guard $ m > 0 && m <= 12
+  expectChar '/'
+  d <- p12digits
+  guard $ d > 0 && d < 32
+  pure $ PartialDate m d
+
+pFullDate :: Parser Day
+pFullDate = do
+  y <- p4digits
+  expectChar '-'
+  m <- p2digits
+  expectChar '-'
+  d <- p2digits
+  maybe empty pure $ fromGregorianValid (fromIntegral y) m d
+
+pTimeOfDay :: Parser TimeOfDay
+pTimeOfDay = do
+  h <- p12digits
+  guard $ h >= 0 && h < 23
+  expectChar ':'
+  m <- p2digits
+  guard $ m >= 0 && m < 59
+  pure $ TimeOfDay h m 0
+
+pTimeZone :: Parser TimeZone
+pTimeZone = do
+  sign <-
+    char >>= \case
+      '+' -> pure 1
+      '-' -> pure (-1)
+      _ -> empty
+  h <- p12digits
+  m <- optional $ do
+    expectChar ':'
+    m <- p2digits
+    guard $ m >= 0 && m < 59
+    pure m
+  pure $ minutesToTimeZone (sign * (h * 60 + fromMaybe 0 m))
 
 newtype Parser a = Parser (forall s r. (s -> Step s Char) -> s -> (a -> s -> r) -> r -> r)
   deriving (Functor)
@@ -75,80 +187,7 @@ p12digits = do
   md2 <- optional digit
   pure $ maybe d1 (\d2 -> d1 * 10 + d2) md2
 
-parsePartialDate :: Parser PartialDate
-parsePartialDate =
-  asum
-    [ do
-        year <- p4digits <|> ((2000 +) <$> p2digits)
-        sep
-        month <- p12digits
-        sep
-        day <- p12digits
-        maybe empty (pure . Exact) $ fromGregorianValid (fromIntegral year) month day,
-      do
-        d1 <- p12digits
-        md2 <- optional $ sep >> p12digits
-        pure $ case md2 of
-          Nothing -> Partial Nothing d1
-          Just d2 -> Partial (Just d1) d2
-    ]
-  where
-    {-# INLINE sep #-}
-    sep =
-      char >>= \case
-        '-' -> pure ()
-        '/' -> pure ()
-        _ -> empty
-
-parseTime :: Parser (TimeOfDay, Maybe TimeZone)
-parseTime = do
-  tod <- do
-    h <- p12digits
-    expectChar ':'
-    m <- p2digits
-    maybe empty pure $ makeTimeOfDayValid h m 0
-  mtz <- optional $ do
-    expectChar ' '
-    sign <-
-      char >>= \case
-        '+' -> pure 1
-        '-' -> pure (-1)
-        _ -> empty
-    hmin <- (* 60) <$> p12digits
-    mmin <- optional $ do
-      expectChar ':'
-      p2digits
-    pure $ minutesToTimeZone $ sign * (hmin + fromMaybe 0 mmin)
-  pure (tod, mtz)
-
-parsePartialDateTime :: Parser (Either PartialDate PartialDateTime)
-parsePartialDateTime =
-  asum
-    [ (\(tod, mtz) -> Right $ PartialDateTime tod Nothing mtz) <$> parseTime,
-      do
-        dt <- parsePartialDate
-        mt <- optional $ expectChar ' ' >> parseTime
-        pure $ case mt of
-          Nothing -> Left dt
-          Just (tod, mtz) -> Right $ PartialDateTime tod (Just dt) mtz
-    ]
-
-parseTimeStamp :: Parser (Timestamp PartialDate PartialDateTime)
-parseTimeStamp = do
-  start <- parsePartialDateTime
-  mend <- optional $ do
-    expectChar ' '
-    expectChar '-'
-    expectChar ' '
-    parsePartialDateTime
-  case (start, mend) of
-    (Left dt, Nothing) -> pure $ Date dt
-    (Right dt, Nothing) -> pure $ DateTime dt
-    (Left start', Just (Left end)) -> pure $ DateRange start' end
-    (Right start', Just (Right end)) -> pure $ DateTimeRange start' end
-    _ -> empty
-
-parseTimeStamps :: Text -> [Timestamp PartialDate PartialDateTime]
+parseTimeStamps :: Text -> [PartialTimestamp]
 parseTimeStamps txt = case stream txt of
   Stream k s0 _ -> go s0
     where
@@ -158,4 +197,4 @@ parseTimeStamps txt = case stream txt of
         Yield '[' s' -> pTimestamp' k s' (\ts s'' -> ts : go s'') (go s')
         Yield _ s' -> go s'
   where
-    Parser pTimestamp' = parseTimeStamp <* expectChar ']'
+    Parser pTimestamp' = parseTimestamp <* expectChar ']'
