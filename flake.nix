@@ -1,5 +1,5 @@
 {
-  description = "slog";
+  description = "monolog";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
   inputs.flake-utils.url = "github:numtide/flake-utils";
@@ -10,10 +10,10 @@
         haskell = prev.haskell // {
           packageOverrides = hfinal: hprev:
             prev.haskell.packageOverrides hfinal hprev // {
-              slog = hfinal.callCabal2nix "slog" ./. { };
+              monolog = hfinal.callCabal2nix "monolog" ./. { };
             };
         };
-        slog = final.haskell.lib.compose.justStaticExecutables final.haskellPackages.slog;
+        monolog = final.haskell.lib.compose.justStaticExecutables final.haskellPackages.monolog;
       };
       perSystem = system:
         let
@@ -22,10 +22,10 @@
         in
         {
           devShells = rec {
-            default = slog-shell;
-            slog-shell = hspkgs.shellFor {
+            default = monolog-shell;
+            monolog-shell = hspkgs.shellFor {
               withHoogle = true;
-              packages = p: [ p.slog ];
+              packages = p: [ p.monolog ];
               buildInputs = [
                 hspkgs.cabal-install
                 hspkgs.haskell-language-server
@@ -36,8 +36,8 @@
             };
           };
           packages = rec {
-            default = slog;
-            slog = pkgs.slog;
+            default = monolog;
+            monolog = pkgs.monolog;
           };
         };
     in

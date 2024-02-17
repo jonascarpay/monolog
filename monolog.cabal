@@ -1,5 +1,5 @@
 cabal-version:   2.4
-name:            slog
+name:            monolog
 version:         0
 license:         BSD-3-Clause
 build-type:      Simple
@@ -15,10 +15,10 @@ extra-doc-files:
 -- category:
 -- description:     description
 -- synopsis:        one-line synopsis
--- homepage:        https://github.com/FIXME/slog#readme
+-- homepage:        https://github.com/FIXME/monolog#readme
 -- source-repository head
 --   type:     git
---   location: git://github.com/FIXME/slog.git
+--   location: git://github.com/FIXME/monolog.git
 
 common common-options
   build-depends:      base >=4.9 && <5
@@ -67,14 +67,14 @@ library
     , uuid
     , warp
 
-executable slog-exe
+executable monolog-exe
   import:         common-options
   hs-source-dirs: app
   main-is:        Main.hs
-  build-depends:  slog
+  build-depends:  monolog
   ghc-options:    -threaded -rtsopts -with-rtsopts=-N
 
-test-suite slog-test
+test-suite monolog-test
   import:         common-options
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
@@ -82,18 +82,18 @@ test-suite slog-test
   build-depends:
     , hspec
     , HUnit
+    , monolog
     , QuickCheck
-    , slog
 
   ghc-options:    -threaded -rtsopts -with-rtsopts=-N
 
-benchmark slog-bench
+benchmark monolog-bench
   import:         common-options
   type:           exitcode-stdio-1.0
   hs-source-dirs: bench
   main-is:        Main.hs
   build-depends:
     , criterion
-    , slog
+    , monolog
 
   ghc-options:    -threaded -rtsopts -with-rtsopts=-N

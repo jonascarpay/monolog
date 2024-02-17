@@ -4,13 +4,13 @@ cradle:
     #   config: {cradle: {none: }}
 
     - path: "src"
-      config: {cradle: {cabal: {component: "lib:slog"}}}
+      config: {cradle: {cabal: {component: "lib:monolog"}}}
 
     - path: "app"
-      config: {cradle: {cabal: {component: "slog:slog-exe"}}}
+      config: {cradle: {cabal: {component: "monolog:monolog-exe"}}}
 
     - path: "test"
-      config: {cradle: {cabal: {component: "slog:slog-test"}}}
+      config: {cradle: {cabal: {component: "monolog:monolog-test"}}}
 
     - path: "bench"
-      config: {cradle: {cabal: {component: "slog:slog-bench"}}}
+      config: {cradle: {cabal: {component: "monolog:monolog-bench"}}}
