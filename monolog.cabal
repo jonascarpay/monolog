@@ -45,6 +45,7 @@ library
   exposed-modules:
     Api
     IO
+    Monolog.Parser
     Monolog.Time
     NoteDb
 

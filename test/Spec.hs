@@ -2,6 +2,7 @@
 
 import Data.Text (Text, unpack)
 import Data.Time
+import Monolog.Parser
 import Monolog.Time
 import Test.Hspec
 
@@ -56,6 +57,6 @@ main =
         [DateTimeRange "2011-12-13 13:00 +09:00" "2011-12-13 14:00 +09:00"]
       hasTimestamps
         "foo [3/14 13:00 - 01:00] bar"
-        [DateTimeRange "2012-03-14 13:00 +09:00" "2012-03-14 14:00 +09:00"]
+        [DateTimeRange "2012-03-14 13:00 +09:00" "2012-03-15 01:00 +09:00"]
 
 -- it "single timestamp" $ parseTimeStamps "[12 13:00 - 14 13:00]" `shouldBe` []
