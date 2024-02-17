@@ -8,7 +8,7 @@ import Monolog.Parser
 import Test.Hspec
 
 parseDate :: String -> Day
-parseDate = parseTimeOrError False defaultTimeLocale "%Y-%m%-d"
+parseDate = parseTimeOrError False defaultTimeLocale "%Y-%m-%d"
 
 parseDateTime :: String -> ZonedTime
 parseDateTime = parseTimeOrError False defaultTimeLocale "%Y-%m-%d %H:%M %Ez"
@@ -48,14 +48,6 @@ main =
         shouldBe
           (parseTimeStamps "foo [3/14 13:00 - 01:00] bar")
           [DateTimeRangePartial (PartialDate 3 14) (TimeOfDay 13 0 0) Nothing (TimeOfDay 1 0 0) Nothing]
-    --   it "exact date" $
-    --     shouldBe
-    --       (parseTimeStamps "foo [2024-02-13] bar")
-    --       [DateFull (fromGregorian 2024 2 13)]
-    --   it "exact date range" $
-    --     shouldBe
-    --       (parseTimeStamps "foo [2024-02-13 - 2024-02-14] bar")
-    --       [DateRange (Exact $ fromGregorian 2024 2 13) (Exact $ fromGregorian 2024 2 14)]
     --   it "exact datetime" $
     --     shouldBe
     --       (parseTimeStamps "foo [2024-02-13 13:00] bar")
@@ -69,24 +61,15 @@ main =
     --       (parseTimeStamps "foo [2024-02-13] bar [2024-02-11] baz")
     --       [Date (Exact $ fromGregorian 2024 2 13), Date (Exact $ fromGregorian 2024 2 11)]
     describe "timestamp conversion" $ do
-      hasTimestamps
-        "foo [13:00] bar"
-        [datetime "2011-12-13 13:00 +09:00"]
-      hasTimestamps
-        "foo [13:00 +00:00] bar"
-        [datetime "2011-12-13 13:00 +00:00"]
-      hasTimestamps
-        "foo [13:00 - 14:00] bar"
-        [datetimeRange "2011-12-13 13:00 +09:00" "2011-12-13 14:00 +09:00"]
-      hasTimestamps
-        "foo [3/14 13:00] bar"
-        [datetime "2012-03-14 13:00 +09:00"]
-      hasTimestamps
-        "foo [3/14 13:00 +0] bar"
-        [datetime "2012-03-14 13:00 +00:00"]
-      hasTimestamps
-        "foo [3/14 13:00 - 01:00] bar"
-        [datetimeRange "2012-03-14 13:00 +09:00" "2012-03-15 01:00 +09:00"]
-      hasTimestamps
-        "foo [2012-03-14 13:00 - 01:00] bar"
-        [datetimeRange "2012-03-14 13:00 +09:00" "2012-03-15 01:00 +09:00"]
+      hasTimestamps "foo [3/14] bar" [date "2012-03-14"]
+      hasTimestamps "foo [3/14] bar [2/13] baz" [date "2012-03-14", date "2012-02-13"]
+      hasTimestamps "foo [2024-03-14] bar" [date "2024-03-14"]
+      hasTimestamps "foo [3/14 - 3/15] bar" [dateRange "2012-03-14" "2012-03-15"]
+      hasTimestamps "foo [2024-03-14 - 2024-03-15] bar" [dateRange "2024-03-14" "2024-03-15"]
+      hasTimestamps "foo [13:00] bar" [datetime "2011-12-13 13:00 +09:00"]
+      hasTimestamps "foo [13:00 +00:00] bar" [datetime "2011-12-13 13:00 +00:00"]
+      hasTimestamps "foo [13:00 - 14:00] bar" [datetimeRange "2011-12-13 13:00 +09:00" "2011-12-13 14:00 +09:00"]
+      hasTimestamps "foo [3/14 13:00] bar" [datetime "2012-03-14 13:00 +09:00"]
+      hasTimestamps "foo [3/14 13:00 +0] bar" [datetime "2012-03-14 13:00 +00:00"]
+      hasTimestamps "foo [3/14 13:00 - 01:00] bar" [datetimeRange "2012-03-14 13:00 +09:00" "2012-03-15 01:00 +09:00"]
+      hasTimestamps "foo [2012-03-14 13:00 - 01:00] bar" [datetimeRange "2012-03-14 13:00 +09:00" "2012-03-15 01:00 +09:00"]
