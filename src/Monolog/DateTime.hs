@@ -22,16 +22,26 @@ data Timestamp
   deriving (Show)
 
 data PartialTimestamp
-  = DatePartial PartialDate
-  | DateFull FullDate
-  | DateTimeToday TimeOfDay (Maybe TimeZone)
-  | DateTimePartial PartialDate TimeOfDay (Maybe TimeZone)
-  | DateTimeFull FullDate TimeOfDay (Maybe TimeZone)
-  | DateRangePartial PartialDate PartialDate
-  | DateRangeFull FullDate FullDate
-  | DateTimeRangeToday TimeOfDay TimeOfDay (Maybe TimeZone)
-  | DateTimeRangePartial PartialDate TimeOfDay (Maybe PartialDate) TimeOfDay (Maybe TimeZone)
-  | DateTimeRangeFull FullDate TimeOfDay (Maybe FullDate) TimeOfDay (Maybe TimeZone)
+  = -- 12/7
+    DatePartial PartialDate
+  | -- 2024-12-07
+    DateFull FullDate
+  | -- 13:00[ +09:00]
+    DateTimeToday TimeOfDay (Maybe TimeZone)
+  | -- 3/13 13:00[ +09:00]
+    DateTimePartial PartialDate TimeOfDay (Maybe TimeZone)
+  | -- 2024-03-13 13:00[ +09:00]
+    DateTimeFull FullDate TimeOfDay (Maybe TimeZone)
+  | -- 3/14 - 3/18
+    DateRangePartial PartialDate PartialDate
+  | -- 2024-03-14 - 2024-03-18
+    DateRangeFull FullDate FullDate
+  | -- 13:00 - 14:00[ +09:00]
+    DateTimeRangeToday TimeOfDay TimeOfDay (Maybe TimeZone)
+  | -- 12/7 12:00 - [12/8 ]01:00[ +9:00]
+    DateTimeRangePartial PartialDate TimeOfDay (Maybe PartialDate) TimeOfDay (Maybe TimeZone)
+  | -- 2024-12-07 12:00 - [2024-12-08 ]01:00[ +9:00]
+    DateTimeRangeFull FullDate TimeOfDay (Maybe FullDate) TimeOfDay (Maybe TimeZone)
   deriving (Eq, Show)
 
 fromPartialDate :: Day -> PartialDate -> Maybe Day
@@ -100,20 +110,3 @@ fromPartialTimestamp lref@(ZonedTime (LocalTime localDate _) localTz) scrut = ca
     fromLocalRef mtz = case mtz of
       Just tz' | localTz /= tz' -> utcToZonedTime tz' $ zonedTimeToUTC lref
       _ -> lref
-
--- dates
--- 12/7
--- 2024-12-07
---
--- datetimes
--- 12/7 13:00 [+9:00]
--- 2024-12-07 13:00 [+9:00]
---
--- date ranges
--- 12/7 - 12/13
--- 2024-12-07 - 2024-12-13
---
--- datetime ranges
--- 12:00 - 01:00 [+9:00]
--- 12/7 12:00 - [12/8] 01:00 [+9:00]
--- 2024-12-07 12:00 - [2024-12-08] 01:00 [+9:00]

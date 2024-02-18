@@ -17,7 +17,6 @@ import Monolog.DateTime
 
 parseTimestamp :: Parser PartialTimestamp
 parseTimestamp =
-  -- TODO optimize
   asum
     [ do
         dt <- pPartialDate
