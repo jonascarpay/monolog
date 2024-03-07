@@ -1,4 +1,4 @@
-import Api
+import Monolog.Html
 
 main :: IO ()
 main = mainWithConfig

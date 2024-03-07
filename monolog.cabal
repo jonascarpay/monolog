@@ -43,11 +43,12 @@ library
   import:          common-options
   hs-source-dirs:  src
   exposed-modules:
-    Api
-    IO
     Monolog.DateTime
+    Monolog.File
+    Monolog.Html
     Monolog.Parser
-    NoteDb
+    Monolog.Text
+    Monolog.Types
 
   build-depends:
     , aeson
@@ -58,12 +59,15 @@ library
     , hashable
     , http-api-data
     , http-types
+    , mtl
+    , lifted-base
     , servant
     , servant-blaze
     , servant-server
     , stm
     , text
     , time
+    , transformers
     , unordered-containers
     , uuid
     , warp

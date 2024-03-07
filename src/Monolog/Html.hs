@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 
-module Api
+module Monolog.Html
   ( mainWithConfig,
   )
 where
@@ -8,18 +8,19 @@ where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Reader
 import Data.Maybe
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time
 import Data.UUID (UUID, toString, toText)
 import GHC.Generics (Generic)
-import IO
+import Monolog.File
+import Monolog.Types
 import Network.Wai.Handler.Warp qualified as Warp
-import NoteDb
 import Servant
 import Servant.HTML.Blaze (HTML)
-import System.Directory
 import Text.Blaze.Html (ToMarkup, (!))
 import Text.Blaze.Html qualified as Html
 import Text.Blaze.Html5 (AttributeValue)
@@ -44,7 +45,7 @@ type NoteApi =
     :<|> ReqBody '[FormUrlEncoded] NoteBody :> "archive" :> PostRedirect
     :<|> "reopen" :> PostRedirect
 
-data NotesPage = NotesPage FilePath NoteDb
+data NotesPage = NotesPage FilePath [Note]
 
 instance ToMarkup NotesPage where
   toMarkup (NotesPage path db) =
@@ -102,7 +103,7 @@ instance ToMarkup NotesPage where
                       Html.i ! Attr.class_ "bi bi-journal-arrow-up" $ ""
               )
     where
-      (open, archived) = splitNotes (toDescList db)
+      (open, archived) = splitNotes db
       card uuid hdr bdy = Html.div ! Attr.class_ "card my-3" ! Attr.id (Html.textValue $ toText uuid) $ do
         Html.div ! Attr.class_ "card-header" $ do
           Html.div $ Html.small ! Attr.class_ "text-muted" $ hdr
@@ -122,9 +123,9 @@ partitionWith f (x : xs) = case f x of
     (bs, cs) = partitionWith f xs
 
 splitNotes :: [Note] -> ([(ZonedTime, UUID, Text)], [(ZonedTime, ZonedTime, UUID, Text)])
-splitNotes = partitionWith $ \n -> case n.archive_time of
-  Nothing -> Left (n.open_time, n.id, n.body)
-  Just t -> Right (n.open_time, t, n.id, n.body)
+splitNotes = partitionWith $ \n -> case n.archived of
+  Nothing -> Left (n.created, n.id, n.body.toText)
+  Just t -> Right (n.created, t, n.id, n.body.toText)
 
 pathLink :: FilePath -> [Text] -> AttributeValue
 pathLink path t = Html.textValue $ Text.concat $ "/" : Text.pack path : t
@@ -137,37 +138,32 @@ fmtTime t = Html.time $ Html.string $ formatTime defaultTimeLocale "%y-%m-%d %H:
 
 mainWithConfig :: IO ()
 mainWithConfig = do
-  lock <- newMultiLock
-  Warp.run 8888 $ serve (Proxy @HtmlApi) (server (Env lock))
-
-newtype Env = Env MultiLock
+  env <- newEnv
+  Warp.run 8888 $ serve (Proxy @HtmlApi) (server env)
 
 fixLineEndings :: Text -> Text
 fixLineEndings = Text.replace "\r\n" "\n"
 
 server :: Env -> Server HtmlApi
-server (Env lock) path = getNotes :<|> newNote :<|> noteApi
+server env path = getNotes :<|> newNote :<|> noteApi
   where
+    runApp :: App a -> Handler a
+    runApp (ReaderT app) = liftIO (runExceptT $ app env) >>= either handle pure
+      where
+        handle :: FileError -> Handler a
+        handle NoSuchFile = throwError err404
+        handle NoSuchNote = throwError err404
+
     redirectTo :: String -> Handler Redirection
     redirectTo tgt = pure $ addHeader ('/' : path <> tgt) NoContent
 
-    readDb :: Handler NoteDb
-    readDb = do
-      exists <- liftIO $ doesFileExist path
-      unless exists $ throwError err404
-      liftIO (withRead lock path $ readNoteDb path)
-
-    writeDb :: NoteDb -> Handler ()
-    writeDb db = liftIO $ withWrite lock path $ writeNoteDb path db
-
     getNotes :: Handler NotesPage
-    getNotes = NotesPage path <$> readDb
+    getNotes = NotesPage path <$> runApp (readFileDesc path)
 
     newNote :: NoteBody -> Handler Redirection
     newNote (NoteBody body) = do
-      db <- readDb
       note <- liftIO $ fromPartial $ PartialNote Nothing Nothing Nothing (fixLineEndings body)
-      writeDb $ insertNote note db
+      runApp (insertNote path note)
       redirectTo "#new"
 
     noteApi :: UUID -> Server NoteApi
@@ -175,39 +171,23 @@ server (Env lock) path = getNotes :<|> newNote :<|> noteApi
       where
         putBody :: NoteBody -> Handler Redirection
         putBody (NoteBody body') = do
-          db <- readDb
-          case lookupNote noteId db of
-            Nothing -> throwError err404
-            Just note -> do
-              let note' = note {body = fixLineEndings body'} :: Note
-              writeDb $ insertNote note' db
-              redirectTo $ '#' : toString noteId
+          runApp $ updateBody path noteId body'
+          redirectTo $ '#' : toString noteId
 
         archivePutNote :: NoteBody -> Handler Redirection
         archivePutNote (NoteBody body')
           | Text.null body' = do
-              db <- readDb
-              writeDb $ deleteNote noteId db
+              runApp $ deleteNote path noteId
               redirectTo "#new"
           | otherwise = do
               now <- liftIO getZonedTime
-              db <- readDb
-              case lookupNote noteId db of
-                Nothing -> throwError err404
-                Just note -> do
-                  let note' = (note {body = fixLineEndings body', archive_time = Just now} :: Note)
-                  writeDb $ insertNote note' db
-                  redirectTo "#open"
+              runApp $ modifyNote path noteId $ \n -> n {archived = Just now, body = mkBody body'}
+              redirectTo "#open"
 
         reopenNote :: Handler Redirection
         reopenNote = do
-          db <- readDb
-          case lookupNote noteId db of
-            Nothing -> throwError err404
-            Just note -> do
-              let note' = (note {archive_time = Nothing} :: Note)
-              writeDb $ insertNote note' db
-              redirectTo $ '#' : toString noteId
+          runApp $ modifyNote path noteId $ \n -> n {archived = Nothing}
+          redirectTo $ '#' : toString noteId
 
 newtype NoteBody = NoteBody
   {body :: Text}
