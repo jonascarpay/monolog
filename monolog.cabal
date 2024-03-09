@@ -48,7 +48,7 @@ library
     Monolog.Html
     Monolog.Parser
     Monolog.Text
-    Monolog.Types
+    Monolog.Note
 
   build-depends:
     , aeson

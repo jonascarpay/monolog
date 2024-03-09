@@ -1,8 +1,4 @@
-{-# LANGUAGE StrictData #-}
-
--- TODO Monolog.Note
--- TODO Hide Body/Note constructors
-module Monolog.Types
+module Monolog.Note
   ( Note (..),
     mkNote,
     mkBody,

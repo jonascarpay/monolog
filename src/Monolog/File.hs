@@ -34,8 +34,8 @@ import Data.Text (Text)
 import Data.Text.Lazy.IO qualified as Lazy
 import Data.Time
 import Data.UUID (UUID)
+import Monolog.Note
 import Monolog.Text (parseText, printText)
-import Monolog.Types
 import System.Directory (doesFileExist)
 
 newtype NoteDb = NoteDb {unNoteDb :: HashMap UUID Note}

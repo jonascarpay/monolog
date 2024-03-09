@@ -17,7 +17,7 @@ import Data.Time
 import Data.UUID (UUID, toString, toText)
 import GHC.Generics (Generic)
 import Monolog.File
-import Monolog.Types
+import Monolog.Note
 import Network.Wai.Handler.Warp qualified as Warp
 import Servant
 import Servant.HTML.Blaze (HTML)

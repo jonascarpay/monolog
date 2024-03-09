@@ -12,7 +12,7 @@ import Data.Text.Lazy.Builder qualified as Builder
 import Data.Time
 import Data.UUID (UUID)
 import Data.UUID qualified as UUID
-import Monolog.Types
+import Monolog.Note
 
 printText :: [Note] -> Lazy.Text
 printText = Builder.toLazyText . mconcat . List.intersperse (Builder.fromText separator <> "\n") . fmap build
